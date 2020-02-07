@@ -132,7 +132,7 @@ class Model(object):
         self.csv_logger = CSVLogger(self.log_path)
 
     def save_top_features(self):
-        """Generate top featires from base model and save to pickle files."""
+        """Generate top features from base model and save to pickle files."""
 
         # Data paths
         train_path = os.path.join(self.data_dir, 'train_features.pkl')
