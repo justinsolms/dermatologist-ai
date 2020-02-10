@@ -92,21 +92,24 @@ class Model(object):
             weights='imagenet',
             include_top=False,
             input_tensor=input_tensor,
-            pooling=None,
+            pooling=None,  # So we fully control the top model interface
             )
         self.base_model = base_model
 
-        # Top network model
+        # Top network model added to base model
         logger.info('Initializing top model.')
         top_model = Sequential()
+        top_model.add(self.base_model)
         top_model.add(GlobalAveragePooling2D(
             input_shape=base_model.output_shape[1:]))
+        top_model.add(Dense(n_dense, activation='relu'))
+        top_model.add(Dropout(dropout))
         top_model.add(Dense(n_dense, activation='relu'))
         top_model.add(Dropout(dropout))
         top_model.add(Dense(n_outputs, activation='softmax'))
 
         #  Set up model training
-        logger.info('Compiling top model.')
+        logger.info('Compiling  model.')
         top_model.compile(
             optimizer=Adam(lr=self.learn_rate),
             loss='categorical_crossentropy',
@@ -130,6 +133,27 @@ class Model(object):
 
         # Callback to save dat logs to CSV
         self.csv_logger = CSVLogger(self.log_path)
+
+    def set_base_trainable_layers(block_names=None):
+        # Source - Dipanjan (DJ) Sarkar
+
+        if block_names is None:
+            self.base_model.trainable = False
+        else:
+            self.base_model.trainable = True
+
+        # FIXME: Not finished
+        set_trainable = False
+        for layer in self.base_model.layers:
+            if layer.name in ['block5_conv1', 'block4_conv1']:
+                set_trainable = True
+            if set_trainable:
+                layer.trainable = True
+            else:
+                layer.trainable = False
+
+        layers = [(layer, layer.name, layer.trainable) for layer in self.base_model.layers]
+        pd.DataFrame(layers, columns=['Layer Type', 'Layer Name', 'Layer Trainable'])
 
     def save_top_features(self):
         """Generate top features from base model and save to pickle files."""
