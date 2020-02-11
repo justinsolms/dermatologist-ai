@@ -6,7 +6,6 @@ __author__ = "Justin Solms"
 __version__ = "0.0.0"
 __license__ = "GPL"
 
-
 import numpy as np
 import pandas as pd
 import PIL
@@ -17,36 +16,104 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import train_test_split
 
+from keras.preprocessing.image import ImageDataGenerator
+
 import pickle
 import os
 
 from logzero import logger
 
+from dermatologist.common import CommonObject
 
-class _Object(object):
+
+class CommonObject(object):
+    """A common object to be inherited by all classes."""
     data_dir = os.path.join('dermatologist', 'data')
+    image_dir = os.path.join(data_dir, 'HAM10000_images')
+    generator_dir = os.path.join(data_dir, 'image_generator')
     train_meta_csv = os.path.join(data_dir, 'train.csv')
     test_meta_csv = os.path.join(data_dir, 'test.csv')
     random_state = 1
 
-class Data(_Object):
 
-    def __init__(self):
-        train_path = os.path.join(self.data_dir, 'train.pkl')
-        test_path = os.path.join(self.data_dir, 'test.pkl')
-        category_path = os.path.join(self.data_dir, 'category.pkl')
-        logger.info('Reading train data set.')
-        with open(train_path, 'rb') as stream:
-            self.train_labels, self.train_data = pickle.load(stream)
-        logger.info('Reading test data set.')
-        with open(test_path, 'rb') as stream:
-            self.test_labels, self.test_data = pickle.load(stream)
-        logger.info('Reading data categories.')
-        with open(category_path, 'rb') as stream:
-            self.categories = pickle.load(stream)
+class Data(CommonObject):
+
+    def __init__(self,
+                 validation_split=0.2,
+                 batch_size=32,
+                 target_size=(192, 192),
+                 save_to_dir=False,
+                 ):
+        """Initialization."""
+        # To save generated images or not
+        if not save_to_dir:
+            self.generator_dir = None
+
+        self.validation_split = validation_split
+        self.batch_size = batch_size
+        self.target_size = target_size
+
+        self.shape = target_size + (3,)
+
+        # Load training metadata CSV file
+        logger.info('Loading training metadata from {}'.format(
+            self.train_meta_csv))
+        train_meta_df = pd.read_csv(self.train_meta_csv)
+
+        # Training image augmentation generator
+        self.num_samples = len(train_meta_df.index) * (1. - validation_split)
+        logger.info('Creating train data generator.')
+        self.train_generator = ImageDataGenerator(
+            rescale=1./255,
+            validation_split=self.validation_split,
+            # featurewise_center=True,
+            # featurewise_std_normalization=True,
+            rotation_range=5,
+            width_shift_range=0.05,
+            height_shift_range=0.05,
+            horizontal_flip=True,
+            vertical_flip=True,
+            zoom_range=0.05,
+            fill_mode='constant',
+            ).flow_from_dataframe(
+                train_meta_df,
+                directory=self.image_dir,
+                x_col='file_name',
+                y_col='category',
+                weight_col=None,  # FIXME:
+                target_size=self.target_size,
+                color_mode='rgb',
+                class_mode='categorical',
+                batch_size=self.batch_size,
+                save_to_dir=self.generator_dir,
+                save_prefix='train',
+            )
+
+        # Load testing metadata CSV file
+        logger.info('Loading testing metadata from {}'.format(
+            self.train_meta_csv))
+        test_meta_df = pd.read_csv(self.test_meta_csv)
+
+        # Testing image augmentation generator
+        logger.info('Creating train data generator.')
+        self.test_generator = ImageDataGenerator(
+            rescale=1./255
+            ).flow_from_dataframe(
+                test_meta_df,
+                directory=self.image_dir,
+                x_col='file_name',
+                y_col='category',
+                weight_col=None,  # FIXME:
+                target_size=self.target_size,
+                color_mode='rgb',
+                class_mode='categorical',
+                batch_size=self.batch_size,
+                save_to_dir=self.generator_dir,
+                save_prefix='test',
+            )
 
 
-class RawData(_Object):
+class RawData(CommonObject):
 
     def __init__(self, test_size=0.20):
 
@@ -58,6 +125,10 @@ class RawData(_Object):
         # load Meta-data
         logger.info('Loading meta-data.')
         data = pd.read_csv(meta_data_path)
+
+        # Add image filename column
+        logger.info('Add image file-name column.')
+        data['file_name'] = data.image_id.map(lambda f: '{}.jpg'.format(f))
 
         #  Classification
         # Information as provided: HAM10000 dataset - Tschandl, Rosendahl, Kittler

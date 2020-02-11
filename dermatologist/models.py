@@ -13,6 +13,8 @@ import os
 
 from datetime import datetime
 
+from math import ceil
+
 import argparse
 from logzero import logger
 
@@ -30,12 +32,14 @@ from keras.applications.inception_v3 import InceptionV3
 from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
 from keras.layers import Dropout, Flatten, Dense, Input
 from keras.models import Sequential
-from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.callbacks import CSVLogger
 from keras.applications import VGG16, Xception
 from keras.models import Model
 from keras.optimizers import Adam
+
+from dermatologist.data import Data
+
 
 class Model(object):
 
@@ -45,22 +49,34 @@ class Model(object):
     best_model_path = 'weights.best.{}.hdf5'
     data_dir = os.path.join('dermatologist', 'data')
 
-    def __init__(self, data_object,
+    def __init__(self,
                  epochs=100,
                  batch_size=48,
                  n_dense=512,
                  dropout=0.2,
-                 learn_rate=0.001,
+                 learn_rate=0.0002,
                  n_outputs=7,
+                 target_size=(192, 192),
+                 validation_split=0.2,
+                 steps_per_epoch=None,
                  ):
 
-        self.data = data_object
         self.dropout = dropout
         self.n_dense = n_dense
         self.n_outputs = n_outputs
         self.epochs = epochs
         self.batch_size = batch_size
         self.learn_rate = learn_rate
+        self.target_size = target_size
+        self.validation_split = validation_split
+        self.steps_per_epoch = steps_per_epoch
+
+        # Instantiate data augmentation object
+        self.data = Data(
+            validation_split=self.validation_split,
+            batch_size=self.batch_size,
+            target_size=self.target_size,
+            )
 
         #  Make model save directory
         if not os.path.exists(self.output_path):
@@ -85,7 +101,7 @@ class Model(object):
             self.output_path, self.history_path.format(self.identifier) )
 
         # ImageNet InceptionV3 base network.
-        input_tensor = Input(shape=self.data.train_data.shape[1:])
+        input_tensor = Input(shape=self.data.shape)
         # Base network model with fixed weights
         logger.info('Initializing base model.')
         base_model = VGG16(
@@ -98,24 +114,28 @@ class Model(object):
 
         # Top network model added to base model
         logger.info('Initializing top model.')
-        top_model = Sequential()
-        top_model.add(self.base_model)
-        top_model.add(GlobalAveragePooling2D(
+        model = Sequential()
+        model.add(self.base_model)
+        model.add(GlobalAveragePooling2D(
             input_shape=base_model.output_shape[1:]))
-        top_model.add(Dense(n_dense, activation='relu'))
-        top_model.add(Dropout(dropout))
-        top_model.add(Dense(n_dense, activation='relu'))
-        top_model.add(Dropout(dropout))
-        top_model.add(Dense(n_outputs, activation='softmax'))
+        model.add(Dense(n_dense, activation='relu'))
+        model.add(Dropout(dropout))
+        model.add(Dense(n_dense, activation='relu'))
+        model.add(Dropout(dropout))
+        model.add(Dense(n_outputs, activation='softmax'))
 
         #  Set up model training
         logger.info('Compiling  model.')
-        top_model.compile(
+        model.compile(
             optimizer=Adam(lr=self.learn_rate),
             loss='categorical_crossentropy',
             metrics=['accuracy', 'categorical_crossentropy'],
             )
-        self.top_model = top_model
+        self.model = model
+
+        # Initialize base layers to non-trainable
+        # FIXME: Log sum more!
+        self.set_base_trainable_layers()
 
         logger.info('Creating callbacks')
 
@@ -134,87 +154,62 @@ class Model(object):
         # Callback to save dat logs to CSV
         self.csv_logger = CSVLogger(self.log_path)
 
-    def set_base_trainable_layers(block_names=None):
-        # Source - Dipanjan (DJ) Sarkar
+    def set_base_trainable_layers(self, layer_names=None):
+        # Get all layer names
+        model_layer_names = [layer.name for layer in self.base_model.layers]
 
-        if block_names is None:
-            self.base_model.trainable = False
-        else:
+        if layer_names is not None:
+            # Check if all specified layer_names are in model layer names
+            if not all(name in model_layer_names for name in layer_names):
+                raise ValueError('Unexpected layer_names, not in base model.')
+            for layer in self.base_model.layers:
+                if layer.name in layer_names:
+                    layer.trainable = True
+                else:
+                    layer.trainable = False
+            # We have set layers, now set model
             self.base_model.trainable = True
-
-        # FIXME: Not finished
-        set_trainable = False
-        for layer in self.base_model.layers:
-            if layer.name in ['block5_conv1', 'block4_conv1']:
-                set_trainable = True
-            if set_trainable:
-                layer.trainable = True
-            else:
+        else:
+            #  Set entire base mode not trainable
+            for layer in self.base_model.layers:
                 layer.trainable = False
+            # We have set layers, now set model
+            self.base_model.trainable = False
 
-        layers = [(layer, layer.name, layer.trainable) for layer in self.base_model.layers]
-        pd.DataFrame(layers, columns=['Layer Type', 'Layer Name', 'Layer Trainable'])
-
-    def save_top_features(self):
-        """Generate top features from base model and save to pickle files."""
-
-        # Data paths
-        train_path = os.path.join(self.data_dir, 'train_features.pkl')
-        test_path = os.path.join(self.data_dir, 'test_features.pkl')
-
-        # Compute the inputs to the top
-        logger.info('Computing top train feature data.')
-        train_features = self.base_model.predict(
-            self.data.train_data, verbose=1)
-        logger.info('Computing top test feature data.')
-        test_features = self.base_model.predict(
-            self.data.test_data, verbose=1)
-
-        # Save to pickle files
-        logger.info('Saving train top feature set.')
-        with open(train_path, 'wb') as stream:
-            pickle.dump(train_features, stream)
-        logger.info('Saving test top feature set.')
-        with open(test_path, 'wb') as stream:
-            pickle.dump(test_features, stream)
-
-        self.train_features = train_features
-        self.test_features = test_features
-
-    def load_top_features(self):
-        """Load generated top features of base model from to pickle files."""
-
-        # Data paths
-        train_path = os.path.join(self.data_dir, 'train_features.pkl')
-        test_path = os.path.join(self.data_dir, 'test_features.pkl')
-
-        # Load from pickle files
-        logger.info('Loading train top feature set.')
-        with open(train_path, 'rb') as stream:
-            self.train_features = pickle.load(stream)
-        logger.info('Loading test top feature set.')
-        with open(test_path, 'rb') as stream:
-            self.test_features = pickle.load(stream)
+        # Print layers training table
+        # Source - Dipanjan (DJ) Sarkar
+        layers = [(layer, layer.name, layer.trainable)
+                  for layer in self.base_model.layers]
+        output = pd.DataFrame(
+            layers, columns=['Layer Type', 'Layer Name', 'Layer Trainable'])
+        print(output)
 
     def fit(self):
+        # Set steps per epoch
+        if self.steps_per_epoch is None:
+            steps_per_epoch = ceil(self.data.num_samples / self.batch_size)
+        else:
+            steps_per_epoch = self.steps_per_epoch
+
         # Train the model
-        logger.info('Training top model from base features.')
-        self.history = self.top_model.fit(
-            self.train_features, self.data.train_labels,
-            validation_split=0.2,
+        logger.info('Training steps per epoch {}.'.format(steps_per_epoch))
+        self.history = self.model.fit_generator(
+            generator=self.data.train_generator,
+            steps_per_epoch=steps_per_epoch,
             epochs=self.epochs,
-            batch_size=self.batch_size,
             callbacks=[
                 self.checkpointer,
                 self.stopper,
                 self.csv_logger,
                 ],
-            verbose=0)
+            workers=2,
+            use_multiprocessing=True,
+            verbose=2)
 
         #  Load best model weights
         path = os.path.join(self.output_path, self.best_model_path)
         if os.path.exists(path):
-            self.top_model.load_weights(path)
+            self.model.load_weights(path)
 
     def predict(self):
         pass
@@ -225,7 +220,7 @@ class Model(object):
         predictions = list()
         for feature in self.test_features:
             predictions.append(
-                self.top_model.predict(np.expand_dims(feature, axis=0))
+                self.model.predict(np.expand_dims(feature, axis=0))
                 )
         predictions = np.array(predictions).squeeze()
 
