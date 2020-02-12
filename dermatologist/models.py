@@ -33,7 +33,7 @@ from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
 from keras.layers import Dropout, Flatten, Dense, Input
 from keras.models import Sequential
 from keras.callbacks import ModelCheckpoint, EarlyStopping
-from keras.callbacks import CSVLogger
+from keras.callbacks import CSVLogger, ProgbarLogger
 from keras.applications import VGG16, Xception
 from keras.models import Model
 from keras.optimizers import Adam
@@ -55,7 +55,6 @@ class Model(object):
                  n_dense=512,
                  dropout=0.2,
                  learn_rate=0.0002,
-                 n_outputs=7,
                  target_size=(192, 192),
                  validation_split=0.2,
                  steps_per_epoch=None,
@@ -63,7 +62,6 @@ class Model(object):
 
         self.dropout = dropout
         self.n_dense = n_dense
-        self.n_outputs = n_outputs
         self.epochs = epochs
         self.batch_size = batch_size
         self.learn_rate = learn_rate
@@ -71,21 +69,24 @@ class Model(object):
         self.validation_split = validation_split
         self.steps_per_epoch = steps_per_epoch
 
+
         # Instantiate data augmentation object
         self.data = Data(
             validation_split=self.validation_split,
             batch_size=self.batch_size,
             target_size=self.target_size,
             )
+        self.n_outputs = self.data.n_classes
+        n_outputs = self.data.n_classes
 
         #  Make model save directory
         if not os.path.exists(self.output_path):
             os.mkdir(self.output_path)
 
         #  Prefix (or suffix or in-between) for training job outputs batch
-        self.identifier = '{}-e:{}-b:{}-n:{}-d:{}-l:{}'.format(
+        self.identifier = '{}-e:{}-b:{}-n:{}-d:{}-l:{}-s:{}'.format(
             datetime.now().strftime('%FT%T'),
-            epochs, batch_size, n_dense, dropout, learn_rate,
+            epochs, batch_size, n_dense, dropout, learn_rate, steps_per_epoch
         )
         logger.info('Train Id is: {}'.format(self.identifier))
 
@@ -112,15 +113,21 @@ class Model(object):
 
         # Callback for early stropping
         self.stopper = EarlyStopping(
-            monitor='val_loss', min_delta=0,
-            patience=20, verbose=1, mode='auto')
+            monitor='val_loss',
+            min_delta=0,
+            patience=10,
+            mode='auto',
+            verbose=1,
+            )
 
         # Callback to save best weights
         self.checkpointer = ModelCheckpoint(
+            monitor='val_loss',
             filepath=self.best_model_path,
-            verbose=1,
             save_best_only=True,
-            save_weights_only=True)
+            save_weights_only=True,
+            verbose=1,
+            )
 
         # Callback to save dat logs to CSV
         self.csv_logger = CSVLogger(self.log_path)
@@ -139,16 +146,17 @@ class Model(object):
 
     def add_top_model(self):
         # Top network model added to base model
-        logger.info('Adding top model.')
+        logger.info('Adding top model - Interface shape: {}'.format(
+            self.base_model.output_shape[1:]))
         self.model = Sequential()
         self.model.add(self.base_model)
         self.model.add(GlobalAveragePooling2D(
-            input_shape=base_model.output_shape[1:]))
-        self.model.add(Dense(n_dense, activation='relu'))
-        self.model.add(Dropout(dropout))
-        self.model.add(Dense(n_dense, activation='relu'))
-        self.model.add(Dropout(dropout))
-        self.model.add(Dense(n_outputs, activation='softmax'))
+            input_shape=self.base_model.output_shape[1:]))
+        self.model.add(Dense(self.n_dense, activation='relu'))
+        self.model.add(Dropout(self.dropout))
+        # self.model.add(Dense(self.n_dense, activation='relu'))
+        # self.model.add(Dropout(self.dropout))
+        self.model.add(Dense(self.n_outputs, activation='softmax'))
 
     def compile_model(self):
         logger.info('Compiling  model.')
@@ -196,7 +204,7 @@ class Model(object):
         logger.info('Fitting model.')
         data = self.data  # Training data object
         # Set steps per epoch
-        if self.steps_per_epoch is None:
+        if self.steps_per_epoch is None or self.steps_per_epoch == 0:
             steps_per_epoch = data.train_flow.samples // self.batch_size
             validation_steps = data.validation_flow.samples // self.batch_size
         else:
@@ -204,7 +212,7 @@ class Model(object):
             validation_steps = self.steps_per_epoch * data.validation_split
 
         # Train the model
-        logger.info('Training steps per epoch {}.'.format(steps_per_epoch))
+        logger.info('Training steps per epoch: {}.'.format(steps_per_epoch))
         self.history = self.model.fit_generator(
             generator=data.train_flow,
             validation_data=data.validation_flow,
@@ -218,7 +226,8 @@ class Model(object):
                 ],
             # workers=2,
             use_multiprocessing=True,
-            verbose=2)
+            verbose=1,
+            )
 
         #  Load best model weights
         path = os.path.join(self.output_path, self.best_model_path)

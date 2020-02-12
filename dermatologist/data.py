@@ -53,6 +53,8 @@ class Data(CommonObject):
 
         self.shape = target_size + (3,)
 
+        self.n_classes = 7  # TODO: Get this form the flow
+
         # Load training metadata CSV file
         logger.info('Loading training metadata from {}'.format(
             self.train_meta_csv))
@@ -104,7 +106,6 @@ class Data(CommonObject):
             save_prefix='valid',
             seed=self.random_state,
             )
-
 
 
         # Load testing metadata CSV file
