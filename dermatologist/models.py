@@ -87,6 +87,7 @@ class Model(object):
             datetime.now().strftime('%FT%T'),
             epochs, batch_size, n_dense, dropout, learn_rate,
         )
+        logger.info('Train Id is: {}'.format(self.identifier))
 
         # Best weights path.
         self.best_model_path = os.path.join(
@@ -100,41 +101,11 @@ class Model(object):
         self.history_path = os.path.join(
             self.output_path, self.history_path.format(self.identifier) )
 
-        # ImageNet InceptionV3 base network.
-        input_tensor = Input(shape=self.data.shape)
-        # Base network model with fixed weights
-        logger.info('Initializing base model.')
-        base_model = VGG16(
-            weights='imagenet',
-            include_top=False,
-            input_tensor=input_tensor,
-            pooling=None,  # So we fully control the top model interface
-            )
-        self.base_model = base_model
 
-        # Top network model added to base model
-        logger.info('Initializing top model.')
-        model = Sequential()
-        model.add(self.base_model)
-        model.add(GlobalAveragePooling2D(
-            input_shape=base_model.output_shape[1:]))
-        model.add(Dense(n_dense, activation='relu'))
-        model.add(Dropout(dropout))
-        model.add(Dense(n_dense, activation='relu'))
-        model.add(Dropout(dropout))
-        model.add(Dense(n_outputs, activation='softmax'))
+        self.add_base_model()
 
-        #  Set up model training
-        logger.info('Compiling  model.')
-        model.compile(
-            optimizer=Adam(lr=self.learn_rate),
-            loss='categorical_crossentropy',
-            metrics=['accuracy', 'categorical_crossentropy'],
-            )
-        self.model = model
+        self.add_top_model()
 
-        # Initialize base layers to non-trainable
-        # FIXME: Log sum more!
         self.set_base_trainable_layers()
 
         logger.info('Creating callbacks')
@@ -154,7 +125,41 @@ class Model(object):
         # Callback to save dat logs to CSV
         self.csv_logger = CSVLogger(self.log_path)
 
+    def add_base_model(self):
+        logger.info('Adding base model.')
+        # ImageNet InceptionV3 base network.
+        input_tensor = Input(shape=self.data.shape)
+        # Base network model with fixed weights
+        self.base_model = VGG16(
+            weights='imagenet',
+            include_top=False,
+            input_tensor=input_tensor,
+            pooling=None,  # So we fully control the top model interface
+            )
+
+    def add_top_model(self):
+        # Top network model added to base model
+        logger.info('Adding top model.')
+        self.model = Sequential()
+        self.model.add(self.base_model)
+        self.model.add(GlobalAveragePooling2D(
+            input_shape=base_model.output_shape[1:]))
+        self.model.add(Dense(n_dense, activation='relu'))
+        self.model.add(Dropout(dropout))
+        self.model.add(Dense(n_dense, activation='relu'))
+        self.model.add(Dropout(dropout))
+        self.model.add(Dense(n_outputs, activation='softmax'))
+
+    def compile_model(self):
+        logger.info('Compiling  model.')
+        self.model.compile(
+            optimizer=Adam(lr=self.learn_rate),
+            loss='categorical_crossentropy',
+            metrics=['accuracy', 'categorical_crossentropy'],
+            )
+
     def set_base_trainable_layers(self, layer_names=None):
+        logger.info('Setting trainable layers.')
         # Get all layer names
         model_layer_names = [layer.name for layer in self.base_model.layers]
 
@@ -176,6 +181,9 @@ class Model(object):
             # We have set layers, now set model
             self.base_model.trainable = False
 
+        # It is necessary to compile model again after these changes.
+        self.compile_model()
+
         # Print layers training table
         # Source - Dipanjan (DJ) Sarkar
         layers = [(layer, layer.name, layer.trainable)
@@ -185,24 +193,30 @@ class Model(object):
         print(output)
 
     def fit(self):
+        logger.info('Fitting model.')
+        data = self.data  # Training data object
         # Set steps per epoch
         if self.steps_per_epoch is None:
-            steps_per_epoch = ceil(self.data.num_samples / self.batch_size)
+            steps_per_epoch = data.train_flow.samples // self.batch_size
+            validation_steps = data.validation_flow.samples // self.batch_size
         else:
             steps_per_epoch = self.steps_per_epoch
+            validation_steps = self.steps_per_epoch * data.validation_split
 
         # Train the model
         logger.info('Training steps per epoch {}.'.format(steps_per_epoch))
         self.history = self.model.fit_generator(
-            generator=self.data.train_generator,
+            generator=data.train_flow,
+            validation_data=data.validation_flow,
             steps_per_epoch=steps_per_epoch,
+            validation_steps=validation_steps,
             epochs=self.epochs,
             callbacks=[
                 self.checkpointer,
                 self.stopper,
                 self.csv_logger,
                 ],
-            workers=2,
+            # workers=2,
             use_multiprocessing=True,
             verbose=2)
 

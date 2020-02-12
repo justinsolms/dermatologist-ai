@@ -23,8 +23,6 @@ import os
 
 from logzero import logger
 
-from dermatologist.common import CommonObject
-
 
 class CommonObject(object):
     """A common object to be inherited by all classes."""
@@ -62,7 +60,7 @@ class Data(CommonObject):
 
         # Training image augmentation generator
         self.num_samples = len(train_meta_df.index) * (1. - validation_split)
-        logger.info('Creating train data generator.')
+        logger.info('Creating training data generator.')
         self.train_generator = ImageDataGenerator(
             rescale=1./255,
             validation_split=self.validation_split,
@@ -75,19 +73,39 @@ class Data(CommonObject):
             vertical_flip=True,
             zoom_range=0.05,
             fill_mode='constant',
-            ).flow_from_dataframe(
-                train_meta_df,
-                directory=self.image_dir,
-                x_col='file_name',
-                y_col='category',
-                weight_col=None,  # FIXME:
-                target_size=self.target_size,
-                color_mode='rgb',
-                class_mode='categorical',
-                batch_size=self.batch_size,
-                save_to_dir=self.generator_dir,
-                save_prefix='train',
             )
+        self.train_flow = self.train_generator.flow_from_dataframe(
+            train_meta_df,
+            directory=self.image_dir,
+            x_col='file_name',
+            y_col='category',
+            weight_col=None,  # FIXME:
+            target_size=self.target_size,
+            color_mode='rgb',
+            class_mode='categorical',
+            batch_size=self.batch_size,
+            save_to_dir=self.generator_dir,
+            subset='training',  # Set as training data
+            save_prefix='train',
+            seed=self.random_state,
+            )
+        self.validation_flow = self.train_generator.flow_from_dataframe(
+            train_meta_df,
+            directory=self.image_dir,
+            x_col='file_name',
+            y_col='category',
+            weight_col=None,  # FIXME:
+            target_size=self.target_size,
+            color_mode='rgb',
+            class_mode='categorical',
+            batch_size=self.batch_size,
+            save_to_dir=self.generator_dir,
+            subset='validation',  # Set as validation data
+            save_prefix='valid',
+            seed=self.random_state,
+            )
+
+
 
         # Load testing metadata CSV file
         logger.info('Loading testing metadata from {}'.format(
@@ -95,21 +113,23 @@ class Data(CommonObject):
         test_meta_df = pd.read_csv(self.test_meta_csv)
 
         # Testing image augmentation generator
-        logger.info('Creating train data generator.')
+        logger.info('Creating testing data generator.')
         self.test_generator = ImageDataGenerator(
             rescale=1./255
-            ).flow_from_dataframe(
-                test_meta_df,
-                directory=self.image_dir,
-                x_col='file_name',
-                y_col='category',
-                weight_col=None,  # FIXME:
-                target_size=self.target_size,
-                color_mode='rgb',
-                class_mode='categorical',
-                batch_size=self.batch_size,
-                save_to_dir=self.generator_dir,
-                save_prefix='test',
+            )
+        self.test_flow = self.test_generator.flow_from_dataframe(
+            test_meta_df,
+            directory=self.image_dir,
+            x_col='file_name',
+            y_col='category',
+            weight_col=None,  # FIXME:
+            target_size=self.target_size,
+            color_mode='rgb',
+            class_mode='categorical',
+            batch_size=self.batch_size,
+            save_to_dir=self.generator_dir,
+            save_prefix='test',
+            seed=self.random_state,
             )
 
 
