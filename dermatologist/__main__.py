@@ -22,18 +22,13 @@ def main(args):
 
     #  Load and process raw data
     if args.new == True:
-        logger.info('Forced to load new raw images.')
-        raw_data = RawData(image_size=(192, 192))
-        raw_data.save_data()
-        del raw_data  # Save space
+        logger.info('Forced to re-create test-train set image metadata.')
+        raw_data = RawData()
 
-    # Load data container
-    logger.info('Initializing data container.')
-    data = Data()
 
     # Load model
+    logger.info('Initializing Model class.')
     model = Model(
-        data,
         epochs=args.epochs,
         batch_size=args.batch_size,
         n_dense=args.n_dense,
@@ -41,15 +36,8 @@ def main(args):
         learn_rate=args.learn_rate,
     )
 
-    #  Generate and save/cache base output as top features
-    if args.generate == True:
-        logger.info('Forced to generate and cache top features from base.')
-        model.save_top_features()
-    else:
-        logger.info('Loading top features from cache files.')
-        model.load_top_features()
-
     # Train model
+    logger.info('Training top model.')
     model.fit()
 
     # Make reports
