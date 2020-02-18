@@ -115,7 +115,7 @@ class Model(object):
         self.stopper = EarlyStopping(
             monitor='val_loss',
             min_delta=0,
-            patience=10,
+            patience=5,
             mode='auto',
             verbose=1,
             )
