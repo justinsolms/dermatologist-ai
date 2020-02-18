@@ -42,7 +42,7 @@ def main(args):
     model.fit()
 
     # Make reports
-    model.report()
+    # model.report()
 
 
 if __name__ == "__main__":
