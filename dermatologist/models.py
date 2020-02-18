@@ -206,10 +206,9 @@ class Model(object):
         # Set steps per epoch
         if self.steps_per_epoch is None or self.steps_per_epoch == 0:
             steps_per_epoch = data.train_flow.samples // self.batch_size
-            validation_steps = data.validation_flow.samples // self.batch_size
         else:
             steps_per_epoch = self.steps_per_epoch
-            validation_steps = self.steps_per_epoch * data.test_split
+        validation_steps = data.validation_flow.samples
 
         # Train the model
         logger.info('Training steps per epoch: {}.'.format(steps_per_epoch))
@@ -217,6 +216,7 @@ class Model(object):
             generator=data.train_flow,
             validation_data=data.validation_flow,
             steps_per_epoch=steps_per_epoch,
+            validation_steps=validation_steps,
             epochs=self.epochs,
             callbacks=[
                 self.checkpointer,
