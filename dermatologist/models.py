@@ -126,7 +126,7 @@ class Model(object):
             filepath=self.best_model_path,
             save_best_only=True,
             save_weights_only=True,
-            verbose=1,
+            verbose=0,
             )
 
         # Callback to save dat logs to CSV
