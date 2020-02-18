@@ -56,7 +56,7 @@ class Model(object):
                  dropout=0.2,
                  learn_rate=0.0002,
                  target_size=(192, 192),
-                 validation_split=0.2,
+                 test_split=0.2,
                  steps_per_epoch=None,
                  ):
 
@@ -66,13 +66,13 @@ class Model(object):
         self.batch_size = batch_size
         self.learn_rate = learn_rate
         self.target_size = target_size
-        self.validation_split = validation_split
+        self.test_split = test_split
         self.steps_per_epoch = steps_per_epoch
 
 
         # Instantiate data augmentation object
         self.data = Data(
-            validation_split=self.validation_split,
+            test_split=self.test_split,
             batch_size=self.batch_size,
             target_size=self.target_size,
             )
@@ -209,7 +209,7 @@ class Model(object):
             validation_steps = data.validation_flow.samples // self.batch_size
         else:
             steps_per_epoch = self.steps_per_epoch
-            validation_steps = self.steps_per_epoch * data.validation_split
+            validation_steps = self.steps_per_epoch * data.test_split
 
         # Train the model
         logger.info('Training steps per epoch: {}.'.format(steps_per_epoch))
