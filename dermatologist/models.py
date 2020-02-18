@@ -217,7 +217,6 @@ class Model(object):
             generator=data.train_flow,
             validation_data=data.validation_flow,
             steps_per_epoch=steps_per_epoch,
-            validation_steps=validation_steps,
             epochs=self.epochs,
             callbacks=[
                 self.checkpointer,
