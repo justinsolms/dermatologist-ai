@@ -224,8 +224,7 @@ class Model(object):
                 self.stopper,
                 self.csv_logger,
                 ],
-            # workers=2,
-            use_multiprocessing=True,
+            use_multiprocessing = True,
             verbose=1,
             )
 

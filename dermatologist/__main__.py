@@ -7,14 +7,16 @@ __author__ = "Justin Solms"
 __version__ = "0.0.0"
 __license__ = "GPL"
 
-from dermatologist.data import Data, RawData
-from dermatologist.models import Model
-
 import os
+
+# Backend to use
+os.environ['KERAS_BACKEND'] = 'tensorflow'
+
 import argparse
 from logzero import logger
 
-os.environ['KERAS_BACKEND'] = 'tensorflow'
+from dermatologist.data import Data, RawData
+from dermatologist.models import Model
 
 def main(args):
     """ Main entry point of the app."""
