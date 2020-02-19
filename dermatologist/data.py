@@ -27,7 +27,7 @@ from logzero import logger
 class CommonObject(object):
     """A common object to be inherited by all classes."""
     data_dir = os.path.join('dermatologist', 'data')
-    image_dir = os.path.join(data_dir, 'HAM10000_images')
+    image_dir = os.path.join(data_dir, 'ham10000_images')
     generator_dir = os.path.join(data_dir, 'image_generator')
     train_meta_csv = os.path.join(data_dir, 'train.csv')
     valid_meta_csv = os.path.join(data_dir, 'valid.csv')
@@ -86,6 +86,7 @@ class Data(CommonObject):
             batch_size=self.batch_size,
             save_to_dir=self.generator_dir,
             save_prefix='train',
+            shuffle=True,
             seed=self.random_state,
             )
 
@@ -110,6 +111,7 @@ class Data(CommonObject):
             batch_size=self.batch_size,
             save_to_dir=self.generator_dir,
             save_prefix='valid',
+            shuffle=True,
             seed=self.random_state,
             )
 
@@ -134,6 +136,7 @@ class Data(CommonObject):
             batch_size=self.batch_size,
             save_to_dir=self.generator_dir,
             save_prefix='test',
+            shuffle=False,  # Do not shuffle for tests
             seed=self.random_state,
             )
 
