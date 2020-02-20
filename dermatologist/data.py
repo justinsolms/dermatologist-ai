@@ -40,12 +40,15 @@ class CommonObject(object):
 class Data(CommonObject):
 
     def __init__(self,
+                 raw_data_obj,
                  test_split=0.2,
                  batch_size=32,
                  target_size=(192, 192),
                  save_to_dir=False,
                  ):
         """Initialization."""
+        self._raw_data_obj = raw_data_obj
+
         # To save generated images or not
         if not save_to_dir:
             self.generator_dir = None
@@ -56,11 +59,9 @@ class Data(CommonObject):
 
         self.shape = target_size + (3,)
 
-
         # Load category metadata CSV file
-        logger.info('Loading category metadata from {}'.format(
-            self.category_meta_csv))
-        category_meta_df = pd.read_csv(self.category_meta_csv)
+        logger.info('Loading category metadata.')
+        category_meta_df = self._raw_data_obj.category_meta_data
         self.n_categories = len(category_meta_df.index)
         self.categories = category_meta_df
         # Use this to make sure all generator's class_indice property use
@@ -68,9 +69,8 @@ class Data(CommonObject):
         classes = category_meta_df['category'].tolist()
 
         # Load training metadata CSV file
-        logger.info('Loading training metadata from {}'.format(
-            self.train_meta_csv))
-        train_meta_df = pd.read_csv(self.train_meta_csv)
+        logger.info('Loading training metadata.')
+        train_meta_df = self._raw_data_obj.train_meta_data
         # Training image augmentation generator
         logger.info('Creating training data generator.')
         self.train_generator = ImageDataGenerator(
@@ -91,7 +91,7 @@ class Data(CommonObject):
             x_col='file_name',
             y_col='category',
             classes=None,
-            weight_col='class_weight',
+            weight_col=None,
             target_size=self.target_size,
             color_mode='rgb',
             class_mode='categorical',
@@ -103,9 +103,8 @@ class Data(CommonObject):
             )
 
         # Load validation metadata CSV file
-        logger.info('Loading validation metadata from {}'.format(
-            self.valid_meta_csv))
-        valid_meta_df = pd.read_csv(self.valid_meta_csv)
+        logger.info('Loading validation metadata.')
+        valid_meta_df = self._raw_data_obj.valid_meta_data
         # Validation image augmentation generator
         logger.info('Creating validation data generator.')
         self.valid_generator = ImageDataGenerator(
@@ -117,7 +116,7 @@ class Data(CommonObject):
             x_col='file_name',
             y_col='category',
             classes=None,
-            weight_col='class_weight',
+            weight_col=None,
             target_size=self.target_size,
             color_mode='rgb',
             class_mode='categorical',
@@ -129,9 +128,8 @@ class Data(CommonObject):
             )
 
         # Load testing metadata CSV file
-        logger.info('Loading testing metadata from {}'.format(
-            self.test_meta_csv))
-        test_meta_df = pd.read_csv(self.test_meta_csv)
+        logger.info('Loading testing metadata.')
+        test_meta_df = self._raw_data_obj.test_meta_data
         # Testing image augmentation generator
         logger.info('Creating testing data generator.')
         self.test_generator = ImageDataGenerator(
@@ -143,7 +141,7 @@ class Data(CommonObject):
             x_col='file_name',
             y_col='category',
             classes=None,
-            weight_col='class_weight',
+            weight_col=None,
             target_size=self.target_size,
             color_mode='rgb',
             class_mode='categorical',
@@ -153,6 +151,16 @@ class Data(CommonObject):
             shuffle=False,  # Do not shuffle for tests
             seed=self.random_state,
             )
+
+    @property
+    def class_indice_dict(self):
+        """dict: Mapping class name to the class indice (integer)."""
+        return self._raw_data_obj.class_indice_dict
+
+    @property
+    def class_indice_weight_dict(self):
+        """dict: Mapping class indices (integers) to a weight (float) value."""
+        return self._raw_data_obj.class_indice_weight_dict
 
 
 class RawData(CommonObject):
@@ -232,7 +240,7 @@ class RawData(CommonObject):
 
         return mapping
 
-    def save_data_sets(self):
+    def create_data_sets(self):
         logger.info('Split data into train and test sets.')
         self.train_meta_data, self.test_meta_data = train_test_split(
             self.data,
@@ -249,10 +257,11 @@ class RawData(CommonObject):
             )
 
         logger.info('Write categorical meta data csv file.')
-        pd.DataFrame(
+        self.category_meta_data = pd.DataFrame(
             [d for d in self.class_indice_dict.items()],
             columns=['category', 'category_code']
-            ).to_csv(self.category_meta_csv, index=False)
+            )
+        self.category_meta_data.to_csv(self.category_meta_csv, index=False)
 
         logger.info('Write train and test set meta data csv files.')
         self.train_meta_data.to_csv(self.train_meta_csv)
