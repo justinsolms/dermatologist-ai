@@ -41,23 +41,24 @@ class TestRawData(unittest.TestCase):
     def test_save(self):
         """Saving of data files."""
         data = RawData()
+
         # Train, test files
-        train_path = os.path.join(self.data_dir, 'train.pkl')
-        test_path = os.path.join(self.data_dir, 'test.pkl')
-        category_path = os.path.join(self.data_dir, 'category.pkl')
+        train_path = os.path.join(self.data_dir, 'train.csv')
+        valid_path = os.path.join(self.data_dir, 'valid.csv')
+        test_path = os.path.join(self.data_dir, 'test.csv')
 
         # If exists then delete for test
         if os.path.exists(train_path):
             os.remove(train_path)
+        # If exists then delete for valid
+        if os.path.exists(valid_path):
+            os.remove(valid_path)
         # If exists then delete for test
         if os.path.exists(test_path):
             os.remove(test_path)
-        # If exists then delete for test
-        if os.path.exists(category_path):
-            os.remove(category_path)
 
         #  Create files
-        data.save_data()
+        data.save_data_sets()
 
         # Test for cache file exist
         self.assertTrue(os.path.exists(train_path))
