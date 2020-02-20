@@ -90,8 +90,8 @@ class Data(CommonObject):
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
-            classes=classes,
-            weight_col=None,  # TODO: Include weights
+            classes=None,
+            weight_col='class_weight',
             target_size=self.target_size,
             color_mode='rgb',
             class_mode='categorical',
@@ -116,8 +116,8 @@ class Data(CommonObject):
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
-            classes=classes,
-            weight_col=None,  # TODO: Include weights
+            classes=None,
+            weight_col='class_weight',
             target_size=self.target_size,
             color_mode='rgb',
             class_mode='categorical',
@@ -142,8 +142,8 @@ class Data(CommonObject):
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
-            classes=classes,
-            weight_col=None,  # FIXME:
+            classes=None,
+            weight_col='class_weight',
             target_size=self.target_size,
             color_mode='rgb',
             class_mode='categorical',
@@ -156,6 +156,28 @@ class Data(CommonObject):
 
 
 class RawData(CommonObject):
+
+    # Information as provided: HAM10000 dataset - Tschandl, Rosendahl, Kittler
+    _dx_class_dict = {
+        'mel': 'Melanoma', # malignant
+        'akiec': 'Actinic Keratoses', # precursors
+        'bcc': 'Basal cell carcinoma', # grows destructively
+        'bkl': 'Benign keratosis', # benign
+        'nv': 'Melanocytic nevi', # benign
+        'df': 'Dermatofibroma', # benign
+        'vasc': 'Vascular skin lesions', # benign
+        }
+
+    # Deemed importance of classes.
+    _dx_weight_dict = {
+        'mel': 1.0, # malignant
+        'akiec': 1.0, # precursors
+        'bcc': 1.0, # grows destructively
+        'bkl': 1.0, # benign
+        'nv': 1.0, # benign
+        'df': 1.0, # benign
+        'vasc': 1.0, # benign
+        }
 
     def __init__(self, test_size=0.20):
         self.test_size = test_size
@@ -174,38 +196,41 @@ class RawData(CommonObject):
         data['file_name'] = data.image_id.map(lambda f: '{}.jpg'.format(f))
 
         #  Classification
-        # Information as provided: HAM10000 dataset - Tschandl, Rosendahl, Kittler
-        self.dx_class_dict = {
-            'mel': 'Melanoma', # malignant
-            'akiec': 'Actinic Keratoses', # precursors
-            'bcc': 'Basal cell carcinoma', # grows destructively
-            'bkl': 'Benign keratosis', # benign
-            'nv': 'Melanocytic nevi', # benign
-            'df': 'Dermatofibroma', # benign
-            'vasc': 'Vascular skin lesions', # benign
-            }
         logger.info('Adding further classification meta-data.')
-        data['category'] = data.dx.map(self.dx_class_dict)
-        data['category_code'] = data.dx.map(self.dx_int_dict)
+        data['category'] = data.dx.map(self._dx_class_dict)
+        data['category_code'] = data.dx.map(self._dx_indice_dict)
+
         self.data = data
 
     def _dx_class_tuples(self):
         """Return alpha sorted (dx, class) tuples"""
-        dx_class = [(key, value) for key, value in self.dx_class_dict.items()]
+        dx_class = [(key, value) for key, value in self._dx_class_dict.items()]
         dx_class.sort(key=lambda x: x[1])
         return dx_class
 
     @property
-    def dx_int_dict(self):
+    def _dx_indice_dict(self):
+        """dict: Mapping the dx column to the class indice (integer)."""
         dx, _  = zip(*self._dx_class_tuples())
         class_numbers = [i for i in range(len(dx))]
         return dict(zip(dx, class_numbers))
 
     @property
-    def class_int_dict(self):
+    def class_indice_dict(self):
+        """dict: Mapping class name to the class indice (integer)."""
         _, class_names  = zip(*self._dx_class_tuples())
         class_numbers = [i for i in range(len(class_names))]
         return dict(zip(class_names, class_numbers))
+
+    @property
+    def class_indice_weight_dict(self):
+        """dict: Mapping class indices (integers) to a weight (float) value."""
+        mapping = {
+            self._dx_indice_dict[key]: self._dx_weight_dict[key]
+            for key in self._dx_class_dict.keys()
+        }
+
+        return mapping
 
     def save_data_sets(self):
         logger.info('Split data into train and test sets.')
@@ -225,7 +250,7 @@ class RawData(CommonObject):
 
         logger.info('Write categorical meta data csv file.')
         pd.DataFrame(
-            [d for d in self.class_int_dict.items()],
+            [d for d in self.class_indice_dict.items()],
             columns=['category', 'category_code']
             ).to_csv(self.category_meta_csv, index=False)
 
