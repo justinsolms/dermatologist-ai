@@ -1,5 +1,5 @@
 import unittest
-from dermatologist.data import Data
+from dermatologist.data import Generator
 from dermatologist.models import Model
 
 import os
@@ -14,7 +14,7 @@ class TestModel(unittest.TestCase):
 
     def setUp(self):
         # Prepare data
-        self.data_obj = Data()
+        self.data_obj = Generator()
 
     def test_init(self):
         """Initialization and model and data preparation."""

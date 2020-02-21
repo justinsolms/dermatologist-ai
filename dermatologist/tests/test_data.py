@@ -1,5 +1,5 @@
 import unittest
-from dermatologist.data import Data, RawData
+from dermatologist.data import Generator, Data
 import numpy as np
 import os
 
@@ -15,13 +15,13 @@ class TestData(unittest.TestCase):
         self.data_dir = os.path.join('dermatologist', 'data')
         self.random_state = 1
         # Get raw data and save processed data set
-        RawData().save_data()
+        Data().save_data()
 
     def test_init(self):
         """Initialization and data loading."""
-        data = Data()
+        data = Generator()
         #  Test class
-        self.assertIsInstance(data, Data)
+        self.assertIsInstance(data, Generator)
         # Tensor shapes
         self.assertEqual(data.train_data.shape[1:], (Height, Width, Channels))
         self.assertEqual(data.test_data.shape[1:], (Height, Width, Channels))
@@ -40,7 +40,7 @@ class TestRawData(unittest.TestCase):
 
     def test_save(self):
         """Saving of data files."""
-        data = RawData()
+        data = Data()
 
         # Train, test files
         train_path = os.path.join(self.data_dir, 'train.csv')

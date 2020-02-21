@@ -22,13 +22,6 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import classification_report
 
-from keras.applications.inception_v3 import InceptionV3
-# from keras.applications.xception import Xception
-# from keras.applications.vgg16 import VGG16
-# from keras.applications.vgg19 import VGG19
-# from keras.applications.resnet50 import ResNet50
-# from keras.applications.mobilenet import MobileNet
-
 from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
 from keras.layers import Dropout, Flatten, Dense, Input
 from keras.models import Sequential
@@ -38,7 +31,14 @@ from keras.applications import VGG16, Xception
 from keras.models import Model
 from keras.optimizers import Adam
 
-from dermatologist.data import Data
+from keras.applications.inception_v3 import InceptionV3
+# from keras.applications.xception import Xception
+# from keras.applications.vgg16 import VGG16
+# from keras.applications.vgg19 import VGG19
+# from keras.applications.resnet50 import ResNet50
+# from keras.applications.mobilenet import MobileNet
+
+from dermatologist.data import Generator
 
 
 class Model(object):
@@ -56,7 +56,6 @@ class Model(object):
                  dropout=0.2,
                  learn_rate=0.0002,
                  target_size=(192, 192),
-                 test_split=0.2,
                  steps_per_epoch=None,
                  ):
 
@@ -66,18 +65,13 @@ class Model(object):
         self.batch_size = batch_size
         self.learn_rate = learn_rate
         self.target_size = target_size
-        self.test_split = test_split
         self.steps_per_epoch = steps_per_epoch
 
-
         # Instantiate data augmentation object
-        self.data = Data(
-            test_split=self.test_split,
+        self.data = Generator(
             batch_size=self.batch_size,
             target_size=self.target_size,
             )
-        self.n_outputs = self.data.n_categories
-        n_outputs = self.data.n_categories
 
         #  Make model save directory
         if not os.path.exists(self.output_path):
@@ -145,6 +139,7 @@ class Model(object):
             )
 
     def add_top_model(self):
+        n_outputs = self.data.num_classes
         # Top network model added to base model
         logger.info('Adding top model - Interface shape: {}'.format(
             self.base_model.output_shape[1:]))
@@ -156,7 +151,7 @@ class Model(object):
         self.model.add(Dropout(self.dropout))
         # self.model.add(Dense(self.n_dense, activation='relu'))
         # self.model.add(Dropout(self.dropout))
-        self.model.add(Dense(self.n_outputs, activation='softmax'))
+        self.model.add(Dense(n_outputs, activation='softmax'))
 
     def compile_model(self):
         logger.info('Compiling  model.')
@@ -205,12 +200,13 @@ class Model(object):
         data = self.data  # Training data object
         # Set steps per epoch
         if self.steps_per_epoch is None or self.steps_per_epoch == 0:
-            # Keep the steps per epoch and validation steps proportionate.
             steps_per_epoch = data.train_flow.samples // self.batch_size
             validation_steps = data.valid_flow.samples // self.batch_size
         else:
+            # Keep proportions of steps
             steps_per_epoch = self.steps_per_epoch
-            validation_steps = self.steps_per_epoch * data.test_split
+            validation_steps = self.steps_per_epoch * self.data.valid_size
+
 
         # Train the model
         logger.info('Training steps per epoch: {}.'.format(steps_per_epoch))
