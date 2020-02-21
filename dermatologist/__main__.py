@@ -7,21 +7,23 @@ __author__ = "Justin Solms"
 __version__ = "0.0.0"
 __license__ = "GPL"
 
-from dermatologist.data import Data, RawData
-from dermatologist.models import Model
-
 import os
+
+# Backend to use
+os.environ['KERAS_BACKEND'] = 'tensorflow'
+
 import argparse
 from logzero import logger
 
-os.environ['KERAS_BACKEND'] = 'tensorflow'
+from dermatologist.data import Data, RawData
+from dermatologist.models import Model
 
 def main(args):
     """ Main entry point of the app."""
     logger.info(args)
 
     #  Load and process raw data
-    if args.new == True:
+    if args.generate == True:
         logger.info('Forced to re-create test-train set image metadata.')
         raw_data = RawData()
 
@@ -42,7 +44,7 @@ def main(args):
     model.fit()
 
     # Make reports
-    model.report()
+    # model.report()
 
 
 if __name__ == "__main__":
@@ -50,12 +52,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--new", action='store_true',
-        help="Generate and save top features from base",)
-
-    parser.add_argument(
         "--generate", action='store_true',
-        help="Generate and save top features from base",)
+        help="Generate new train/valid/test data sets",)
 
     parser.add_argument(
         "-e", "--epochs", dest="epochs",
@@ -83,7 +81,7 @@ if __name__ == "__main__":
         type=float, default=0.2)
 
     parser.add_argument(
-        "-l", "--", dest="learn_rate",
+        "-l", "--learn_rate", dest="learn_rate",
         help="Learning rate",
         type=float, default=0.0002)
 

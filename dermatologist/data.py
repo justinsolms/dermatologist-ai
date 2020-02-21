@@ -27,9 +27,10 @@ from logzero import logger
 class CommonObject(object):
     """A common object to be inherited by all classes."""
     data_dir = os.path.join('dermatologist', 'data')
-    image_dir = os.path.join(data_dir, 'HAM10000_images')
+    image_dir = os.path.join(data_dir, 'ham10000_images')
     generator_dir = os.path.join(data_dir, 'image_generator')
     train_meta_csv = os.path.join(data_dir, 'train.csv')
+    valid_meta_csv = os.path.join(data_dir, 'valid.csv')
     test_meta_csv = os.path.join(data_dir, 'test.csv')
     random_state = 1
 
@@ -37,7 +38,7 @@ class CommonObject(object):
 class Data(CommonObject):
 
     def __init__(self,
-                 validation_split=0.2,
+                 test_split=0.2,
                  batch_size=32,
                  target_size=(192, 192),
                  save_to_dir=False,
@@ -47,7 +48,7 @@ class Data(CommonObject):
         if not save_to_dir:
             self.generator_dir = None
 
-        self.validation_split = validation_split
+        self.test_split = test_split
         self.batch_size = batch_size
         self.target_size = target_size
 
@@ -59,13 +60,10 @@ class Data(CommonObject):
         logger.info('Loading training metadata from {}'.format(
             self.train_meta_csv))
         train_meta_df = pd.read_csv(self.train_meta_csv)
-
         # Training image augmentation generator
-        self.num_samples = len(train_meta_df.index) * (1. - validation_split)
         logger.info('Creating training data generator.')
         self.train_generator = ImageDataGenerator(
             rescale=1./255,
-            validation_split=self.validation_split,
             # featurewise_center=True,
             # featurewise_std_normalization=True,
             rotation_range=5,
@@ -81,38 +79,46 @@ class Data(CommonObject):
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
-            weight_col=None,  # FIXME:
+            weight_col=None,  # TODO: Include weights
             target_size=self.target_size,
             color_mode='rgb',
             class_mode='categorical',
             batch_size=self.batch_size,
             save_to_dir=self.generator_dir,
-            subset='training',  # Set as training data
             save_prefix='train',
+            shuffle=True,
             seed=self.random_state,
             )
-        self.validation_flow = self.train_generator.flow_from_dataframe(
-            train_meta_df,
+
+        # Load validation metadata CSV file
+        logger.info('Loading validation metadata from {}'.format(
+            self.valid_meta_csv))
+        valid_meta_df = pd.read_csv(self.valid_meta_csv)
+        # Validation image augmentation generator
+        logger.info('Creating validation data generator.')
+        self.valid_generator = ImageDataGenerator(
+            rescale=1./255,
+        )
+        self.validation_flow = self.valid_generator.flow_from_dataframe(
+            valid_meta_df,
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
-            weight_col=None,  # FIXME:
+            weight_col=None,  # TODO: Include weights
             target_size=self.target_size,
             color_mode='rgb',
             class_mode='categorical',
             batch_size=self.batch_size,
             save_to_dir=self.generator_dir,
-            subset='validation',  # Set as validation data
             save_prefix='valid',
+            shuffle=True,
             seed=self.random_state,
             )
 
-
         # Load testing metadata CSV file
         logger.info('Loading testing metadata from {}'.format(
-            self.train_meta_csv))
+            self.test_meta_csv))
         test_meta_df = pd.read_csv(self.test_meta_csv)
-
         # Testing image augmentation generator
         logger.info('Creating testing data generator.')
         self.test_generator = ImageDataGenerator(
@@ -130,6 +136,7 @@ class Data(CommonObject):
             batch_size=self.batch_size,
             save_to_dir=self.generator_dir,
             save_prefix='test',
+            shuffle=False,  # Do not shuffle for tests
             seed=self.random_state,
             )
 
@@ -168,12 +175,20 @@ class RawData(CommonObject):
 
         logger.info('Split data into train and test sets.')
         self.train_meta_data, self.test_meta_data = train_test_split(
-            data, test_size=test_size, stratify=data['category_code'],
+            data,
+            test_size=test_size, stratify=data['category_code'],
+            random_state=self.random_state, shuffle=True,
+            )
+        logger.info('Split train data into train and validation sets.')
+        self.train_meta_data, self.valid_meta_data = train_test_split(
+            self.train_meta_data,
+            test_size=test_size, stratify=self.train_meta_data['category_code'],
             random_state=self.random_state, shuffle=True,
             )
 
         logger.info('Write train and test set meta data csv files.')
         self.train_meta_data.to_csv(self.train_meta_csv)
+        self.valid_meta_data.to_csv(self.valid_meta_csv)
         self.test_meta_data.to_csv(self.test_meta_csv)
 
     # TODO: Include all analysis/exploration plots
