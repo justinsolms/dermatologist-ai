@@ -28,7 +28,7 @@ from logzero import logger
 class CommonObject(object):
     """A common object to be inherited by all classes."""
     data_dir = os.path.join('dermatologist', 'data')
-    image_dir = os.path.join(data_dir, 'ham10000_images')
+    image_dir = os.path.join('../', 'ham10000_images')
     generator_dir = os.path.join(data_dir, 'image_generator')
     train_meta_csv = os.path.join(data_dir, 'train.csv')
     valid_meta_csv = os.path.join(data_dir, 'valid.csv')
