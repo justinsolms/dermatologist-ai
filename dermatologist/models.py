@@ -76,8 +76,8 @@ class Model(object):
             batch_size=self.batch_size,
             target_size=self.target_size,
             )
-        self.n_outputs = self.data.n_classes
-        n_outputs = self.data.n_classes
+        self.n_outputs = self.data.n_categories
+        n_outputs = self.data.n_categories
 
         #  Make model save directory
         if not os.path.exists(self.output_path):
@@ -189,7 +189,7 @@ class Model(object):
             # We have set layers, now set model
             self.base_model.trainable = False
 
-        # It is necessary to compile model again after these changes.
+        # It is necessary to compile the model again after these changes.
         self.compile_model()
 
         # Print layers training table
@@ -207,7 +207,7 @@ class Model(object):
         if self.steps_per_epoch is None or self.steps_per_epoch == 0:
             # Keep the steps per epoch and validation steps proportionate.
             steps_per_epoch = data.train_flow.samples // self.batch_size
-            validation_steps = data.validation_flow.samples // self.batch_size
+            validation_steps = data.valid_flow.samples // self.batch_size
         else:
             steps_per_epoch = self.steps_per_epoch
             validation_steps = self.steps_per_epoch * data.test_split
@@ -216,7 +216,7 @@ class Model(object):
         logger.info('Training steps per epoch: {}.'.format(steps_per_epoch))
         self.history = self.model.fit_generator(
             generator=data.train_flow,
-            validation_data=data.validation_flow,
+            validation_data=data.valid_flow,
             steps_per_epoch=steps_per_epoch,
             validation_steps=validation_steps,
             epochs=self.epochs,

@@ -26,7 +26,7 @@ def main(args):
     if args.generate == True:
         logger.info('Forced to re-create test-train set image metadata.')
         raw_data = RawData()
-
+        raw_data.save_data_sets()
 
     # Load model
     logger.info('Initializing Model class.')

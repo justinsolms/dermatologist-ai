@@ -20,6 +20,7 @@ from keras.preprocessing.image import ImageDataGenerator
 
 import pickle
 import os
+from copy import copy
 
 from logzero import logger
 
@@ -32,18 +33,22 @@ class CommonObject(object):
     train_meta_csv = os.path.join(data_dir, 'train.csv')
     valid_meta_csv = os.path.join(data_dir, 'valid.csv')
     test_meta_csv = os.path.join(data_dir, 'test.csv')
+    category_meta_csv = os.path.join(data_dir, 'categories.csv')
     random_state = 1
 
 
 class Data(CommonObject):
 
     def __init__(self,
+                 raw_data_obj,
                  test_split=0.2,
                  batch_size=32,
                  target_size=(192, 192),
                  save_to_dir=False,
                  ):
         """Initialization."""
+        self._raw_data_obj = raw_data_obj
+
         # To save generated images or not
         if not save_to_dir:
             self.generator_dir = None
@@ -54,12 +59,18 @@ class Data(CommonObject):
 
         self.shape = target_size + (3,)
 
-        self.n_classes = 7  # TODO: Get this form the flow
+        # Load category metadata CSV file
+        logger.info('Loading category metadata.')
+        category_meta_df = self._raw_data_obj.category_meta_data
+        self.n_categories = len(category_meta_df.index)
+        self.categories = category_meta_df
+        # Use this to make sure all generator's class_indice property use
+        # identical class rankings.
+        classes = category_meta_df['category'].tolist()
 
         # Load training metadata CSV file
-        logger.info('Loading training metadata from {}'.format(
-            self.train_meta_csv))
-        train_meta_df = pd.read_csv(self.train_meta_csv)
+        logger.info('Loading training metadata.')
+        train_meta_df = self._raw_data_obj.train_meta_data
         # Training image augmentation generator
         logger.info('Creating training data generator.')
         self.train_generator = ImageDataGenerator(
@@ -79,7 +90,8 @@ class Data(CommonObject):
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
-            weight_col=None,  # TODO: Include weights
+            classes=None,
+            weight_col=None,
             target_size=self.target_size,
             color_mode='rgb',
             class_mode='categorical',
@@ -91,20 +103,20 @@ class Data(CommonObject):
             )
 
         # Load validation metadata CSV file
-        logger.info('Loading validation metadata from {}'.format(
-            self.valid_meta_csv))
-        valid_meta_df = pd.read_csv(self.valid_meta_csv)
+        logger.info('Loading validation metadata.')
+        valid_meta_df = self._raw_data_obj.valid_meta_data
         # Validation image augmentation generator
         logger.info('Creating validation data generator.')
         self.valid_generator = ImageDataGenerator(
             rescale=1./255,
         )
-        self.validation_flow = self.valid_generator.flow_from_dataframe(
+        self.valid_flow = self.valid_generator.flow_from_dataframe(
             valid_meta_df,
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
-            weight_col=None,  # TODO: Include weights
+            classes=None,
+            weight_col=None,
             target_size=self.target_size,
             color_mode='rgb',
             class_mode='categorical',
@@ -116,9 +128,8 @@ class Data(CommonObject):
             )
 
         # Load testing metadata CSV file
-        logger.info('Loading testing metadata from {}'.format(
-            self.test_meta_csv))
-        test_meta_df = pd.read_csv(self.test_meta_csv)
+        logger.info('Loading testing metadata.')
+        test_meta_df = self._raw_data_obj.test_meta_data
         # Testing image augmentation generator
         logger.info('Creating testing data generator.')
         self.test_generator = ImageDataGenerator(
@@ -129,7 +140,8 @@ class Data(CommonObject):
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
-            weight_col=None,  # FIXME:
+            classes=None,
+            weight_col=None,
             target_size=self.target_size,
             color_mode='rgb',
             class_mode='categorical',
@@ -140,10 +152,43 @@ class Data(CommonObject):
             seed=self.random_state,
             )
 
+    @property
+    def class_indice_dict(self):
+        """dict: Mapping class name to the class indice (integer)."""
+        return self._raw_data_obj.class_indice_dict
+
+    @property
+    def class_indice_weight_dict(self):
+        """dict: Mapping class indices (integers) to a weight (float) value."""
+        return self._raw_data_obj.class_indice_weight_dict
+
 
 class RawData(CommonObject):
 
+    # Information as provided: HAM10000 dataset - Tschandl, Rosendahl, Kittler
+    _dx_class_dict = {
+        'mel': 'Melanoma', # malignant
+        'akiec': 'Actinic Keratoses', # precursors
+        'bcc': 'Basal cell carcinoma', # grows destructively
+        'bkl': 'Benign keratosis', # benign
+        'nv': 'Melanocytic nevi', # benign
+        'df': 'Dermatofibroma', # benign
+        'vasc': 'Vascular skin lesions', # benign
+        }
+
+    # Deemed importance of classes.
+    _dx_weight_dict = {
+        'mel': 1.0, # malignant
+        'akiec': 1.0, # precursors
+        'bcc': 1.0, # grows destructively
+        'bkl': 1.0, # benign
+        'nv': 1.0, # benign
+        'df': 1.0, # benign
+        'vasc': 1.0, # benign
+        }
+
     def __init__(self, test_size=0.20):
+        self.test_size = test_size
 
         # Data paths
         meta_data_csv = 'HAM10000_metadata.csv'
@@ -159,37 +204,70 @@ class RawData(CommonObject):
         data['file_name'] = data.image_id.map(lambda f: '{}.jpg'.format(f))
 
         #  Classification
-        # Information as provided: HAM10000 dataset - Tschandl, Rosendahl, Kittler
-        dict_dx = {
-            'mel': 'Melanoma', # malignant
-            'akiec': 'Actinic Keratoses', # precursors
-            'bcc': 'Basal cell carcinoma', # grows destructively
-            'bkl': 'Benign keratosis', # benign
-            'nv': 'Melanocytic nevi', # benign
-            'df': 'Dermatofibroma', # benign
-            'vasc': 'Vascular skin lesions', # benign
-            }
         logger.info('Adding further classification meta-data.')
-        data['category'] = data.dx.map(dict_dx)
-        data['category_code'] = pd.Categorical(data['category']).codes
+        data['category'] = data.dx.map(self._dx_class_dict)
+        data['category_code'] = data.dx.map(self._dx_indice_dict)
 
+        self.data = data
+
+    def _dx_class_tuples(self):
+        """Return alpha sorted (dx, class) tuples"""
+        dx_class = [(key, value) for key, value in self._dx_class_dict.items()]
+        dx_class.sort(key=lambda x: x[1])
+        return dx_class
+
+    @property
+    def _dx_indice_dict(self):
+        """dict: Mapping the dx column to the class indice (integer)."""
+        dx, _  = zip(*self._dx_class_tuples())
+        class_numbers = [i for i in range(len(dx))]
+        return dict(zip(dx, class_numbers))
+
+    @property
+    def class_indice_dict(self):
+        """dict: Mapping class name to the class indice (integer)."""
+        _, class_names  = zip(*self._dx_class_tuples())
+        class_numbers = [i for i in range(len(class_names))]
+        return dict(zip(class_names, class_numbers))
+
+    @property
+    def class_indice_weight_dict(self):
+        """dict: Mapping class indices (integers) to a weight (float) value."""
+        mapping = {
+            self._dx_indice_dict[key]: self._dx_weight_dict[key]
+            for key in self._dx_class_dict.keys()
+        }
+
+        return mapping
+
+    def create_data_sets(self):
         logger.info('Split data into train and test sets.')
         self.train_meta_data, self.test_meta_data = train_test_split(
-            data,
-            test_size=test_size, stratify=data['category_code'],
+            self.data,
+            test_size=self.test_size,
+            stratify=self.data['category_code'],
             random_state=self.random_state, shuffle=True,
             )
         logger.info('Split train data into train and validation sets.')
         self.train_meta_data, self.valid_meta_data = train_test_split(
             self.train_meta_data,
-            test_size=test_size, stratify=self.train_meta_data['category_code'],
+            test_size=self.test_size,
+            stratify=self.train_meta_data['category_code'],
             random_state=self.random_state, shuffle=True,
             )
+
+        logger.info('Write categorical meta data csv file.')
+        self.category_meta_data = pd.DataFrame(
+            [d for d in self.class_indice_dict.items()],
+            columns=['category', 'category_code']
+            )
+        self.category_meta_data.to_csv(self.category_meta_csv, index=False)
 
         logger.info('Write train and test set meta data csv files.')
         self.train_meta_data.to_csv(self.train_meta_csv)
         self.valid_meta_data.to_csv(self.valid_meta_csv)
         self.test_meta_data.to_csv(self.test_meta_csv)
+
 
     # TODO: Include all analysis/exploration plots
 
