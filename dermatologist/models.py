@@ -38,16 +38,18 @@ from keras.applications.inception_v3 import InceptionV3
 # from keras.applications.resnet50 import ResNet50
 # from keras.applications.mobilenet import MobileNet
 
+from sklearn.metrics import f1_score
+
 from dermatologist.data import Generator
 
+from dermatologist.common import CommonObject
 
-class Model(object):
 
-    output_path = 'output'
+class Model(CommonObject):
+
     log_path = 'log.{}.csv'
     history_path = 'history.{}.pkl'
     best_model_path = 'weights.best.{}.hdf5'
-    data_dir = os.path.join('dermatologist', 'data')
 
     def __init__(self,
                  epochs=100,
@@ -58,6 +60,8 @@ class Model(object):
                  target_size=(192, 192),
                  steps_per_epoch=None,
                  ):
+        """Initialization."""
+        super().__init__();
 
         self.dropout = dropout
         self.n_dense = n_dense
@@ -73,9 +77,7 @@ class Model(object):
             target_size=self.target_size,
             )
 
-        #  Make model save directory
-        if not os.path.exists(self.output_path):
-            os.mkdir(self.output_path)
+        logger.info('Output path: {}'.format(self.output_path))
 
         #  Prefix (or suffix or in-between) for training job outputs batch
         self.identifier = '{}-e:{}-b:{}-n:{}-d:{}-l:{}-s:{}'.format(
@@ -207,6 +209,7 @@ class Model(object):
             steps_per_epoch = self.steps_per_epoch
             validation_steps = self.steps_per_epoch * self.data.valid_size
 
+        logger.info('Steps per epoch = {}'.format(steps_per_epoch))
 
         # Train the model
         logger.info('Training steps per epoch: {}.'.format(steps_per_epoch))

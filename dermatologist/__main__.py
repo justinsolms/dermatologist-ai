@@ -13,7 +13,7 @@ import argparse
 from logzero import logger
 
 # Backend to use
-os.environ['KERAS_BACKEND'] = 'theano'
+os.environ['KERAS_BACKEND'] = 'tensorflow'
 
 from dermatologist.models import Model
 from dermatologist.data import Generator, Data

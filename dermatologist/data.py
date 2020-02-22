@@ -24,18 +24,7 @@ from copy import copy
 
 from logzero import logger
 
-
-class CommonObject(object):
-    """A common object to be inherited by all classes."""
-    data_dir = os.path.join('dermatologist', 'data')
-    image_dir = os.path.join('../', 'ham10000_images')
-    generator_dir = os.path.join(data_dir, 'image_generator')
-    train_meta_csv = os.path.join(data_dir, 'train.csv')
-    valid_meta_csv = os.path.join(data_dir, 'valid.csv')
-    test_meta_csv = os.path.join(data_dir, 'test.csv')
-    category_meta_csv = os.path.join(data_dir, 'categories.csv')
-    # TODO: Random state as arg switch passed to ALL methods.
-    random_state = 1
+from dermatologist.common import CommonObject
 
 
 class Data(CommonObject):
@@ -63,15 +52,14 @@ class Data(CommonObject):
         }
 
     def __init__(self):
+        """Initialization."""
+        super().__init__();
 
-        # Generator paths
-        meta_data_csv = 'HAM10000_metadata.csv'
-        images_dir = os.path.join(self.data_dir, 'HAM10000_images')
-        meta_data_path = os.path.join(self.data_dir, meta_data_csv)
+        logger.info('Input path: {}'.format(self.input_path))
 
         # load Meta-data
         logger.info('Loading meta-data.')
-        data = pd.read_csv(meta_data_path)
+        data = pd.read_csv(self.meta_data_path)
 
         # Add image filename column
         logger.info('Add image file-name column.')
