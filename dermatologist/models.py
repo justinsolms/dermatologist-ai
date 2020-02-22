@@ -44,6 +44,20 @@ from dermatologist.data import Generator
 
 from dermatologist.common import CommonObject
 
+import keras
+from sklearn.metrics import f1_score
+
+
+class FloydhubMetrics(keras.callbacks.Callback):
+    """FloydHub Training Metric Integration"""
+
+    def on_epoch_end(self, epoch, logs=None):
+        """Print Training Metrics"""
+        print('{{"metric": "loss", "value": {}, "epoch": {}}}'.format(logs.get('loss'), epoch))
+        print('{{"metric": "accuracy", "value": {}, "epoch": {}}}'.format(logs.get('accuracy'), epoch))
+        print('{{"metric": "val_loss", "value": {}, "epoch": {}}}'.format(logs.get('val_loss'), epoch))
+        print('{{"metric": "val_accuracy", "value": {}, "epoch": {}}}'.format(logs.get('val_accuracy'), epoch))
+
 
 class Model(CommonObject):
 
@@ -98,35 +112,39 @@ class Model(CommonObject):
         self.history_path = os.path.join(
             self.output_path, self.history_path.format(self.identifier) )
 
-
+        # Add base, top, then set and compile them
         self.add_base_model()
-
         self.add_top_model()
-
         self.set_base_trainable_layers()
 
+        # Callbacks list
         logger.info('Creating callbacks')
-
+        self.callbacks = list()
         # Callback for early stropping
-        self.stopper = EarlyStopping(
-            monitor='val_loss',
-            min_delta=0,
-            patience=5,
-            mode='auto',
-            verbose=1,
+        self.callbacks.append(
+            EarlyStopping(
+                monitor='val_loss',
+                min_delta=0,
+                patience=5,
+                mode='auto',
+                verbose=1,
+                )
             )
-
         # Callback to save best weights
-        self.checkpointer = ModelCheckpoint(
-            monitor='val_loss',
-            filepath=self.best_model_path,
-            save_best_only=True,
-            save_weights_only=True,
-            verbose=0,
+        self.callbacks.append(
+            ModelCheckpoint(
+                monitor='val_loss',
+                filepath=self.best_model_path,
+                save_best_only=True,
+                save_weights_only=True,
+                verbose=0,
+                )
             )
-
         # Callback to save dat logs to CSV
-        self.csv_logger = CSVLogger(self.log_path)
+        self.callbacks.append(CSVLogger(self.log_path))
+        # If FloydHub then callback to log FloydHub metrics to stdout
+        if self.host_is == 'floyd_hub':
+            self.callbacks.append(FloydhubMetrics())
 
     def add_base_model(self):
         logger.info('Adding base model.')
@@ -219,11 +237,7 @@ class Model(CommonObject):
             steps_per_epoch=steps_per_epoch,
             validation_steps=validation_steps,
             epochs=self.epochs,
-            callbacks=[
-                self.checkpointer,
-                self.stopper,
-                self.csv_logger,
-                ],
+            callbacks=self.callbacks,
             use_multiprocessing = True,
             verbose=1,
             )

@@ -20,9 +20,11 @@ class CommonObject(object):
 
         # Test to see if if running on FloydHub
         if os.getcwd() == '/floyd/home':
+            self.host_is = 'floyd_hub'
             self.input_path = os.path.join('/floyd/input')
             self.output_path = os.path.join('.', 'output' )
         else:
+            self.host_is = 'local'
             self.input_path = os.path.join('.', 'input')
             self.output_path = os.path.join('.', 'output' )
 
