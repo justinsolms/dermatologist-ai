@@ -239,7 +239,7 @@ class Model(CommonObject):
             epochs=self.epochs,
             callbacks=self.callbacks,
             use_multiprocessing = True,
-            verbose=1,
+            verbose=1 if self.host_is == 'local' else 2,
             )
 
         #  Load best model weights

@@ -61,7 +61,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-e", "--epochs", dest="epochs",
         help="Number of training epochs",
-        type=int, default=500,)
+        type=int, default=40,)
 
     parser.add_argument(
         "-b", "--batch_size", dest="batch_size",
@@ -82,12 +82,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "-d", "--dropout", dest="dropout",
         help="Dropout rate of the trained layer",
-        type=float, default=0.2)
+        type=float, default=0.25)
 
     parser.add_argument(
         "-l", "--learn_rate", dest="learn_rate",
         help="Learning rate",
-        type=float, default=0.0002)
+        type=float, default=0.0001)
 
     parser.add_argument(
         "-v", "--verbose", dest="verbose",

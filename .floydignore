@@ -15,6 +15,7 @@ var
 .DS_Store
 __pycache__
 .vscode
+logskeep
 research
 tests
 input
