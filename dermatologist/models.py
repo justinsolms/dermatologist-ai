@@ -125,7 +125,7 @@ class Model(CommonObject):
             EarlyStopping(
                 monitor='val_loss',
                 min_delta=0,
-                patience=5,
+                patience=10,
                 mode='auto',
                 verbose=1,
                 )
@@ -178,7 +178,8 @@ class Model(CommonObject):
         self.model.compile(
             optimizer=Adam(lr=self.learn_rate),
             loss='categorical_crossentropy',
-            metrics=['accuracy', 'categorical_crossentropy'],
+            # metrics=['accuracy', 'categorical_crossentropy'],
+            metrics=['accuracy'],
             )
 
     def set_base_trainable_layers(self, layer_names=None):

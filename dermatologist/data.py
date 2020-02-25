@@ -211,6 +211,9 @@ class Generator(Data):
 
         self.shape = target_size + (3,)
 
+        # Used to make sure all generators use the identical class rank
+        classes = [*self.class_indice_dict]
+
         # Training image augmentation generator
         logger.info('Creating training data generator.')
         train_meta_df = self.train_meta_data
@@ -218,20 +221,21 @@ class Generator(Data):
             rescale=1./255,
             # featurewise_center=True,
             # featurewise_std_normalization=True,
-            rotation_range=5,
-            width_shift_range=0.05,
-            height_shift_range=0.05,
-            horizontal_flip=True,
-            vertical_flip=True,
-            zoom_range=0.05,
+            # rotation_range=5,
+            # width_shift_range=0.05,
+            # height_shift_range=0.05,
+            # horizontal_flip=True,
+            # vertical_flip=True,
+            # zoom_range=0.05,
             fill_mode='constant',
+            cval=0,
             )
         self.train_flow = self.train_generator.flow_from_dataframe(
             train_meta_df,
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
-            classes=None,
+            classes=classes,
             weight_col=None,
             target_size=self.target_size,
             color_mode='rgb',
@@ -248,13 +252,15 @@ class Generator(Data):
         valid_meta_df = self.valid_meta_data
         self.valid_generator = ImageDataGenerator(
             rescale=1./255,
+            fill_mode='constant',
+            cval=0,
         )
         self.valid_flow = self.valid_generator.flow_from_dataframe(
             valid_meta_df,
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
-            classes=None,
+            classes=classes,
             weight_col=None,
             target_size=self.target_size,
             color_mode='rgb',
@@ -270,14 +276,16 @@ class Generator(Data):
         logger.info('Creating testing data generator.')
         test_meta_df = self.test_meta_data
         self.test_generator = ImageDataGenerator(
-            rescale=1./255
+            rescale=1./255,
+            fill_mode='constant',
+            cval=0,
             )
         self.test_flow = self.test_generator.flow_from_dataframe(
             test_meta_df,
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
-            classes=None,
+            classes=classes,
             weight_col=None,
             target_size=self.target_size,
             color_mode='rgb',
