@@ -1,0 +1,26 @@
+
+# Directories and files to ignore when uploading code to floyd
+
+
+.git
+.eggs
+eggs
+lib
+lib64
+parts
+sdist
+var
+*.pyc
+*.swp
+.DS_Store
+__pycache__
+.vscode
+research
+tests
+input
+output
+log.*
+weights.*
+train.csv
+valid.csv
+test.csv
