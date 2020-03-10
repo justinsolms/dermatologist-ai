@@ -40,6 +40,16 @@ class Data(CommonObject):
         'vasc': 'Vascular skin lesions', # benign
         }
 
+    _dx_indication_dict = {
+        'mel': 'malignant',
+        'akiec': 'precursor',
+        'bcc': 'destructive',
+        'bkl': 'benign',
+        'nv': 'benign',
+        'df': 'benign',
+        'vasc': 'benign',
+        }
+
     # Deemed importance of classes.
     _dx_weight_dict = {
         'mel': 1.0, # malignant
@@ -179,23 +189,23 @@ class Data(CommonObject):
 
     # TODO: Include all analysis/exploration plots
 
-    def plot_categories(self):
+    def histograms(self):
         # Histograms
-        data = self.meta_data
-        data.dx_type.value_counts().plot(kind='bar')
+        data = self.data
+        data.dx.value_counts().plot(kind='bar')
         plt.show()
-        data.sex.value_counts().plot(kind='bar')
-        plt.show()
-        data.localization.value_counts().plot(kind='bar')
-        plt.show()
-        data.classification.value_counts().plot(kind='bar')
-        plt.show()
+        # data.sex.value_counts().plot(kind='bar')
+        # plt.show()
+        # data.localization.value_counts().plot(kind='bar')
+        # plt.show()
+        # data.classification.value_counts().plot(kind='bar')
+        # plt.show()
 
 
 class Generator(Data):
 
     def __init__(self,
-                 batch_size=32,
+                 batch_size=16,
                  target_size=(192, 192),
                  save_to_dir=False,
                  ):
@@ -216,22 +226,21 @@ class Generator(Data):
 
         # Training image augmentation generator
         logger.info('Creating training data generator.')
-        train_meta_df = self.train_meta_data
         self.train_generator = ImageDataGenerator(
             rescale=1./255,
             # featurewise_center=True,
             # featurewise_std_normalization=True,
-            # rotation_range=5,
-            # width_shift_range=0.05,
-            # height_shift_range=0.05,
-            # horizontal_flip=True,
-            # vertical_flip=True,
-            # zoom_range=0.05,
-            fill_mode='constant',
+            rotation_range=5,
+            width_shift_range=0.05,
+            height_shift_range=0.05,
+            horizontal_flip=True,
+            vertical_flip=True,
+            zoom_range=0.05,
+            fill_mode='nearest',
             cval=0,
             )
         self.train_flow = self.train_generator.flow_from_dataframe(
-            train_meta_df,
+            self.train_meta_data,
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
@@ -243,20 +252,18 @@ class Generator(Data):
             batch_size=self.batch_size,
             save_to_dir=self.generator_dir,
             save_prefix='train',
-            shuffle=True,
             seed=self.random_state,
             )
 
         # Validation image augmentation generator
         logger.info('Creating validation data generator.')
-        valid_meta_df = self.valid_meta_data
         self.valid_generator = ImageDataGenerator(
             rescale=1./255,
-            fill_mode='constant',
+            fill_mode='nearest',
             cval=0,
         )
         self.valid_flow = self.valid_generator.flow_from_dataframe(
-            valid_meta_df,
+            self.valid_meta_data,
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
@@ -268,20 +275,18 @@ class Generator(Data):
             batch_size=self.batch_size,
             save_to_dir=self.generator_dir,
             save_prefix='valid',
-            shuffle=True,
             seed=self.random_state,
             )
 
         # Testing image augmentation generator
         logger.info('Creating testing data generator.')
-        test_meta_df = self.test_meta_data
         self.test_generator = ImageDataGenerator(
             rescale=1./255,
-            fill_mode='constant',
+            fill_mode='nearest',
             cval=0,
             )
         self.test_flow = self.test_generator.flow_from_dataframe(
-            test_meta_df,
+            self.test_meta_data,
             directory=self.image_dir,
             x_col='file_name',
             y_col='category',
@@ -293,7 +298,6 @@ class Generator(Data):
             batch_size=self.batch_size,
             save_to_dir=self.generator_dir,
             save_prefix='test',
-            shuffle=False,  # Do not shuffle for tests
             seed=self.random_state,
             )
 

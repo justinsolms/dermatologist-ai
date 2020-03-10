@@ -2,9 +2,18 @@
 """
 
 import os
+import subprocess
+import numpy as np
 
 class CommonObject(object):
     """A common object to be inherited by all classes."""
+
+    # Get the short git commit SHA whilst indicating a dirty repo.
+    commit = subprocess.check_output(
+        'git describe --always --dirty'.split(' ')
+        ).decode('ascii').strip()
+
+    # Common OS path and file names
     data_dir = os.path.join('dermatologist', 'data')
     meta_data_path = os.path.join(data_dir, 'HAM10000_metadata.csv')
     generator_dir = os.path.join(data_dir, 'image_generator')
@@ -14,7 +23,7 @@ class CommonObject(object):
     category_meta_csv = os.path.join(data_dir, 'categories.csv')
 
     # TODO: Random state as arg switch passed to ALL methods.
-    random_state = 1
+    random_state = np.random.randint(1000001)
 
     def __init__(self):
 

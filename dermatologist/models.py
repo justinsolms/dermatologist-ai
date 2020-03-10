@@ -67,6 +67,7 @@ class Model(CommonObject):
 
     def __init__(self,
                  epochs=100,
+                 test_size=0.10,
                  batch_size=48,
                  n_dense=512,
                  dropout=0.2,
@@ -80,6 +81,7 @@ class Model(CommonObject):
         self.dropout = dropout
         self.n_dense = n_dense
         self.epochs = epochs
+        self.test_size = test_size
         self.batch_size = batch_size
         self.learn_rate = learn_rate
         self.target_size = target_size
@@ -94,9 +96,16 @@ class Model(CommonObject):
         logger.info('Output path: {}'.format(self.output_path))
 
         #  Prefix (or suffix or in-between) for training job outputs batch
-        self.identifier = '{}-e:{}-b:{}-n:{}-d:{}-l:{}-s:{}'.format(
+        self.identifier = '{}-{}-e:{}-t:{}-b:{}-n:{}-d:{}-l:{}-s:{}'.format(
             datetime.now().strftime('%FT%T'),
-            epochs, batch_size, n_dense, dropout, learn_rate, steps_per_epoch
+            self.commit,  # Short git commit SHA
+            epochs,
+            test_size,
+            batch_size,
+            n_dense,
+            dropout,
+            learn_rate,
+            steps_per_epoch
         )
         logger.info('Train Id is: {}'.format(self.identifier))
 
@@ -219,24 +228,14 @@ class Model(CommonObject):
     def fit(self):
         logger.info('Fitting model.')
         data = self.data  # Training data object
-        # Set steps per epoch
-        if self.steps_per_epoch is None or self.steps_per_epoch == 0:
-            steps_per_epoch = data.train_flow.samples // self.batch_size
-            validation_steps = data.valid_flow.samples // self.batch_size
-        else:
-            # Keep proportions of steps
-            steps_per_epoch = self.steps_per_epoch
-            validation_steps = self.steps_per_epoch * self.data.valid_size
-
-        logger.info('Steps per epoch = {}'.format(steps_per_epoch))
 
         # Train the model
-        logger.info('Training steps per epoch: {}.'.format(steps_per_epoch))
+        logger.info('Training steps per epoch: {}.'.format(self.steps_per_epoch))
         self.history = self.model.fit_generator(
             generator=data.train_flow,
+            steps_per_epoch=self.steps_per_epoch,
             validation_data=data.valid_flow,
-            steps_per_epoch=steps_per_epoch,
-            validation_steps=validation_steps,
+            validation_steps=len(data.valid_flow),  # Default seems wrong!
             epochs=self.epochs,
             callbacks=self.callbacks,
             use_multiprocessing = True,
