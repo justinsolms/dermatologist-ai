@@ -82,7 +82,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-t", "--test_size", dest="test_size",
         help="Proportion of validation and testing data held back",
-        type=int, default=0.10)
+        type=int, default=0.20)
 
     parser.add_argument(
         "-d", "--dropout", dest="dropout",

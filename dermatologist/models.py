@@ -132,7 +132,7 @@ class Model(CommonObject):
         # Callback for early stropping
         self.callbacks.append(
             EarlyStopping(
-                monitor='val_loss',
+                monitor='val_accuracy',
                 min_delta=0,
                 patience=10,
                 mode='auto',
@@ -142,7 +142,7 @@ class Model(CommonObject):
         # Callback to save best weights
         self.callbacks.append(
             ModelCheckpoint(
-                monitor='val_loss',
+                monitor='val_accuracy',
                 filepath=self.best_model_path,
                 save_best_only=True,
                 save_weights_only=True,
@@ -176,10 +176,8 @@ class Model(CommonObject):
         self.model.add(self.base_model)
         self.model.add(GlobalAveragePooling2D(
             input_shape=self.base_model.output_shape[1:]))
-        self.model.add(Dense(self.n_dense, activation='relu'))
-        self.model.add(Dropout(self.dropout))
         # self.model.add(Dense(self.n_dense, activation='relu'))
-        # self.model.add(Dropout(self.dropout))
+        self.model.add(Dropout(self.dropout))
         self.model.add(Dense(n_outputs, activation='softmax'))
 
     def compile_model(self):
@@ -187,7 +185,6 @@ class Model(CommonObject):
         self.model.compile(
             optimizer=Adam(lr=self.learn_rate),
             loss='categorical_crossentropy',
-            # metrics=['accuracy', 'categorical_crossentropy'],
             metrics=['accuracy'],
             )
 
@@ -237,6 +234,7 @@ class Model(CommonObject):
             validation_data=data.valid_flow,
             validation_steps=len(data.valid_flow),  # Default seems wrong!
             epochs=self.epochs,
+            class_weight=data.class_indice_weight_dict,
             callbacks=self.callbacks,
             use_multiprocessing = True,
             verbose=1 if self.host_is == 'local' else 2,

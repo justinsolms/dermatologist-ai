@@ -52,7 +52,7 @@ class Data(CommonObject):
 
     # Deemed importance of classes.
     _dx_weight_dict = {
-        'mel': 1.0, # malignant
+        'mel': 3.0, # malignant
         'akiec': 1.0, # precursors
         'bcc': 1.0, # grows destructively
         'bkl': 1.0, # benign
